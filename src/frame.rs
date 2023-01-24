@@ -344,11 +344,21 @@ impl CanFdFrame {
         mut flags: IdFlags,
         fd_flags: FdFlags,
     ) -> Result<Self, ConstructionError> {
-        let n = data.len();
 
-        if n > CANFD_MAX_DLEN {
+        if data.len() > CANFD_MAX_DLEN {
             return Err(ConstructionError::TooMuchData);
         }
+
+        let n = match data.len() {
+            0..=8 => data.len(),
+            9..=12 => 12,
+            13..=16 => 16,
+            17..=20 => 20,
+            21..=24 => 24,
+            25..=32 => 32,
+            33..=48 => 48,
+            _ => CANFD_MAX_DLEN
+        };
 
         flags.remove(IdFlags::RTR);
 
@@ -356,7 +366,8 @@ impl CanFdFrame {
         frame.0.can_id = init_id_word(id, flags)?;
         frame.0.len = n as u8;
         frame.0.flags = fd_flags.bits();
-        frame.0.data[..n].copy_from_slice(data);
+        frame.0.data[..data.len()].copy_from_slice(data);
+        frame.0.data[data.len()..n].fill(0);
 
         Ok(frame)
     }
